@@ -1,0 +1,5 @@
+outputs/pluggy-monitor/node_modules/
+outputs/pluggy-monitor/perfil-chrome/
+outputs/pluggy-monitor/saida/
+*.log
+.env
