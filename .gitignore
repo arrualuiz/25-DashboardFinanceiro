@@ -1,0 +1,5 @@
+node_modules/
+perfil-chrome/
+saida/
+*.log
+.env

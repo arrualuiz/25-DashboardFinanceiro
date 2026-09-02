@@ -1,0 +1,13 @@
+{
+  "name": "pluggy-monitor",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "coletar": "node coletar.mjs",
+    "dev": "node server.mjs",
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.52.0"
+  }
+}
