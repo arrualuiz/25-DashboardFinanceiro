@@ -46,5 +46,9 @@ const data = { schemaVersion: 2, collectedAt, source: 'pluggy', pages, connectio
 const stamp = collectedAt.replace(/[:.]/g, '-');
 await fs.writeFile(path.join(OUT, `pluggy-completo-${stamp}.json`), JSON.stringify(data, null, 2), 'utf8');
 await fs.writeFile(path.join(OUT, 'ultimo-completo.json'), JSON.stringify(data, null, 2), 'utf8');
+if (process.env.SHEETS_WEBHOOK_URL) {
+  const response = await fetch(process.env.SHEETS_WEBHOOK_URL, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data) });
+  console.log(`Sheets: ${response.status}`);
+}
 console.log(`Coleta completa concluída em ${OUT}`);
 await browser.close();
