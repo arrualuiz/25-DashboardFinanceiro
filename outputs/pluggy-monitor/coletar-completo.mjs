@@ -21,6 +21,9 @@ if (/login|signin|entrar/i.test(page.url())) {
   await new Promise(resolve => process.stdin.once('data', resolve));
 }
 const collectedAt = new Date().toISOString();
+const now = new Date();
+const pad = value => String(value).padStart(2, '0');
+const fileStamp = `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getDate())}${pad(now.getMonth() + 1)}${now.getFullYear()}`;
 const pages = {};
 async function capture(name, url, actions = []) {
   await page.goto(`${BASE}${url}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
@@ -44,11 +47,10 @@ const connectionText = await page.locator('body').innerText();
 const connections = { checkedAt: collectedAt, activeCount: (connectionText.match(/(\d+)\s*ativas?/i) || [])[1] || null, hasLimitWarning: /limite de conexões atingido/i.test(connectionText) };
 const data = { schemaVersion: 2, collectedAt, source: 'pluggy', pages, connections };
 const stamp = collectedAt.replace(/[:.]/g, '-');
-await fs.writeFile(path.join(OUT, `pluggy-completo-${stamp}.json`), JSON.stringify(data, null, 2), 'utf8');
-await fs.writeFile(path.join(OUT, 'ultimo-completo.json'), JSON.stringify(data, null, 2), 'utf8');
+await fs.writeFile(path.join(OUT, `registro-completo-${fileStamp}.json`), JSON.stringify(data, null, 2), 'utf8');
 if (process.env.SHEETS_WEBHOOK_URL) {
   const response = await fetch(process.env.SHEETS_WEBHOOK_URL, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data) });
   console.log(`Sheets: ${response.status}`);
 }
-console.log(`Coleta completa concluída em ${OUT}`);
+console.log(`Coleta completa concluída: registro-completo-${fileStamp}.json em ${OUT}`);
 await browser.close();

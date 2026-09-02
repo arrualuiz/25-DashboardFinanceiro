@@ -34,6 +34,9 @@ if (/login|signin|entrar/i.test(page.url())) {
 }
 
 const collectedAt = new Date().toISOString();
+const now = new Date();
+const pad = value => String(value).padStart(2, '0');
+const fileStamp = `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getDate())}${pad(now.getMonth() + 1)}${now.getFullYear()}`;
 const text = await page.locator('body').innerText();
 const sections = {};
 for (const heading of ['CONTAS BANCÁRIAS', 'CARTÕES DE CRÉDITO', 'INVESTIMENTOS', 'EVOLUÇÃO DO SALDO']) {
@@ -42,8 +45,7 @@ for (const heading of ['CONTAS BANCÁRIAS', 'CARTÕES DE CRÉDITO', 'INVESTIMENT
 }
 const data = { collectedAt, url: page.url(), title: await page.title(), sections, fullText: text };
 const stamp = collectedAt.replace(/[:.]/g, '-');
-await fs.writeFile(path.join(OUT, `pluggy-${stamp}.json`), JSON.stringify(data, null, 2), 'utf8');
-await fs.writeFile(path.join(OUT, 'ultimo.json'), JSON.stringify(data, null, 2), 'utf8');
+await fs.writeFile(path.join(OUT, `registro-${fileStamp}.json`), JSON.stringify(data, null, 2), 'utf8');
 await page.screenshot({ path: path.join(OUT, `pluggy-${stamp}.png`), fullPage: true });
-console.log(`Coleta concluída: ${Object.keys(sections).length} seções. Arquivos salvos em ${OUT}`);
+console.log(`Coleta concluída: registro-${fileStamp}.json salvo em ${OUT}`);
 await browser.close();

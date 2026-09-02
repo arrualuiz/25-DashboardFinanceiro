@@ -16,7 +16,7 @@ npm run coletar
 
 Uma janela do Chrome será aberta. Faça login manualmente no Pluggy. A sessão fica salva em `perfil-chrome`, sem armazenar sua senha no código. Pressione Enter no PowerShell após concluir o login.
 
-As coletas aparecem em `saida/` como JSON e screenshot. O arquivo `saida/ultimo.json` é o ponto de entrada para a próxima etapa de importação no Google Sheets.
+As coletas aparecem em `saida/` como JSON histórico e screenshot. O nome segue o padrão `registro-HHmmDDMMAAAA.json`; na coleta completa, `registro-completo-HHmmDDMMAAAA.json`.
 
 ## Observações
 
