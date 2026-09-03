@@ -34,8 +34,8 @@ function render(data) {
   let tabs = document.querySelector('.data-tabs');
   if (!tabs) {
     tabs = document.createElement('div'); tabs.className = 'data-tabs';
-    document.querySelector('.intro').after(tabs);
-    const detail = document.createElement('section'); detail.className = 'panel data-detail'; detail.innerHTML = '<h2 id="detail-title">Dados coletados</h2><pre id="detail-content"></pre>'; tabs.after(detail);
+    document.querySelector('footer').before(tabs);
+    const detail = document.createElement('section'); detail.className = 'panel data-detail'; detail.innerHTML = '<div class="panel-head"><h2 id="detail-title">Dados completos da coleta</h2></div><div id="detail-content" class="data-cards"></div>'; tabs.after(detail);
   }
   tabs.innerHTML = '';
   for (const [key, label] of [['overview','Overview'], ['fluxo','Fluxo'], ['ativos','Ativos'], ['conexoes','Status das conexões']]) {
@@ -46,7 +46,13 @@ function render(data) {
   tabs.style.display = 'none';
   const all = Object.entries(pages).map(([key, page]) => `===== ${key.toUpperCase()} =====\n${Object.entries(page.captures || {}).map(([name, lines]) => `-- ${name} --\n${lines.join('\n')}`).join('\n')}`).join('\n\n');
   byId('detail-title').textContent = 'Dados completos da coleta';
-  byId('detail-content').textContent = `${all}\n\n===== STATUS TÉCNICO =====\n${JSON.stringify(data.connections || {}, null, 2)}`;
+  const content = byId('detail-content'); content.innerHTML = '';
+  for (const [key, page] of Object.entries(pages)) {
+    const section = document.createElement('div'); section.className = 'data-page'; section.innerHTML = `<h3>${key}</h3>`;
+    for (const [name, lines] of Object.entries(page.captures || {})) { const group = document.createElement('div'); group.className = 'data-group'; group.innerHTML = `<h4>${name}</h4><div class="data-grid"></div>`; for (const line of lines) { const card = document.createElement('div'); card.className = 'data-card'; card.textContent = line; group.querySelector('.data-grid').append(card); } section.append(group); }
+    content.append(section);
+  }
+  const status = document.createElement('div'); status.className = 'data-page'; status.innerHTML = `<h3>Status técnico</h3><div class="data-card">${data.connections?.activeCount || '?'} conexões ativas</div>`; content.append(status);
 }
 async function load() { byId('refresh').classList.add('loading'); try { const response = await fetch('/api/dados'); if (!response.ok) throw new Error('Sem dados'); render(await response.json()); } catch { byId('updated').textContent = 'Nenhuma coleta encontrada'; } finally { byId('refresh').classList.remove('loading'); } }
 byId('refresh').addEventListener('click', load); load();
