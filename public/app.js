@@ -49,7 +49,12 @@ function render(data) {
   const content = byId('detail-content'); content.innerHTML = '';
   for (const [key, page] of Object.entries(pages)) {
     const section = document.createElement('div'); section.className = 'data-page'; section.innerHTML = `<h3>${key}</h3>`;
-    for (const [name, lines] of Object.entries(page.captures || {})) { const group = document.createElement('div'); group.className = 'data-group'; group.innerHTML = `<h4>${name}</h4><div class="data-grid"></div>`; for (const line of lines) { const card = document.createElement('div'); card.className = 'data-card'; card.textContent = line; group.querySelector('.data-grid').append(card); } section.append(group); }
+    for (const [name, lines] of Object.entries(page.captures || {})) {
+      const group = document.createElement('div'); group.className = 'data-group'; group.innerHTML = `<h4>${name}</h4><div class="table-wrap"><table><tbody></tbody></table></div>`;
+      const body = group.querySelector('tbody');
+      for (let i = 0; i < lines.length; i += 6) { const row = document.createElement('tr'); for (const value of lines.slice(i, i + 6)) { const cell = document.createElement('td'); cell.textContent = value; row.append(cell); } body.append(row); }
+      section.append(group);
+    }
     content.append(section);
   }
   const status = document.createElement('div'); status.className = 'data-page'; status.innerHTML = `<h3>Status técnico</h3><div class="data-card">${data.connections?.activeCount || '?'} conexões ativas</div>`; content.append(status);
