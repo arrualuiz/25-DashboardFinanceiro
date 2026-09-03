@@ -4,6 +4,8 @@
   "type": "module",
   "scripts": {
     "coletar": "node coletar.mjs",
+    "coletar:completo": "node coletar-completo.mjs",
+    "normalizar": "node normalizar.cjs",
     "dev": "node server.mjs",
     "start": "node server.mjs"
   },

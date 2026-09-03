@@ -2,7 +2,10 @@ import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { chromium } from 'playwright';
+const execFileAsync = promisify(execFile);
 
 const BASE = 'https://meu.pluggy.ai';
 const OUT = path.resolve(process.env.PLUGGY_OUT || './saida');
@@ -34,7 +37,7 @@ async function capture(name, url, actions = []) {
       const control = page.getByRole('button', { name: new RegExp(`^${action}$`, 'i') }).first();
       if (await control.count() && await control.isVisible()) { await control.click(); await page.waitForTimeout(700); }
     }
-    captures[action] = (await page.locator('body').innerText()).split('\n').map(v => v.trim()).filter(Boolean);
+    captures[action] = (await page.locator('main').innerText()).split('\n').map(v => v.trim()).filter(Boolean);
   }
   pages[name] = { url: page.url(), captures };
 }
@@ -43,14 +46,17 @@ await capture('fluxo', '/cash', ['Todos', 'Entradas', 'Saídas']);
 await capture('ativos', '/assets', ['Classes', 'Instituições']);
 await page.goto(`${BASE}/connections`, { waitUntil: 'domcontentloaded', timeout: 60000 });
 await page.waitForTimeout(1500);
-const connectionText = await page.locator('body').innerText();
+const connectionText = await page.locator('main').innerText();
 const connections = { checkedAt: collectedAt, activeCount: (connectionText.match(/(\d+)\s*ativas?/i) || [])[1] || null, hasLimitWarning: /limite de conexões atingido/i.test(connectionText) };
 const data = { schemaVersion: 2, collectedAt, source: 'pluggy', pages, connections };
 const stamp = collectedAt.replace(/[:.]/g, '-');
-await fs.writeFile(path.join(OUT, `registro-completo-${fileStamp}.json`), JSON.stringify(data, null, 2), 'utf8');
+const rawFile = path.join(OUT, `registro-completo-${fileStamp}.json`);
+const cleanFile = path.join(OUT, `registro-completo-${fileStamp}-limpo.json`);
+await fs.writeFile(rawFile, JSON.stringify(data, null, 2), 'utf8');
+await execFileAsync(process.execPath, [path.resolve('normalizar.cjs'), rawFile, cleanFile]);
 if (process.env.SHEETS_WEBHOOK_URL) {
   const response = await fetch(process.env.SHEETS_WEBHOOK_URL, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data) });
   console.log(`Sheets: ${response.status}`);
 }
-console.log(`Coleta completa concluída: registro-completo-${fileStamp}.json em ${OUT}`);
+console.log(`Coleta completa concluída: ${path.basename(rawFile)} e ${path.basename(cleanFile)} em ${OUT}`);
 await browser.close();

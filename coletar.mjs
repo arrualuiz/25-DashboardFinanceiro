@@ -37,7 +37,7 @@ const collectedAt = new Date().toISOString();
 const now = new Date();
 const pad = value => String(value).padStart(2, '0');
 const fileStamp = `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getDate())}${pad(now.getMonth() + 1)}${now.getFullYear()}`;
-const text = await page.locator('body').innerText();
+const text = await page.locator('main').innerText();
 const sections = {};
 for (const heading of ['CONTAS BANCÁRIAS', 'CARTÕES DE CRÉDITO', 'INVESTIMENTOS', 'EVOLUÇÃO DO SALDO']) {
   const start = text.toUpperCase().indexOf(heading);
