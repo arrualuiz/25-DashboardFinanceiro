@@ -40,10 +40,13 @@ function render(data) {
   tabs.innerHTML = '';
   for (const [key, label] of [['overview','Overview'], ['fluxo','Fluxo'], ['ativos','Ativos'], ['conexoes','Status das conexões']]) {
     const button = document.createElement('button'); button.textContent = label; button.className = 'tab-button';
-    button.onclick = () => { const capture = pages[key]?.captures?.base || []; byId('detail-title').textContent = label; byId('detail-content').textContent = key === 'conexoes' ? JSON.stringify(data.connections || {}, null, 2) : capture.join('\\n'); };
+    button.onclick = () => { const capture = pages[key]?.captures?.base || []; byId('detail-title').textContent = label; byId('detail-content').textContent = key === 'conexoes' ? JSON.stringify(data.connections || {}, null, 2) : capture.join('\n'); };
     tabs.append(button);
   }
-  tabs.querySelector('button').click();
+  tabs.style.display = 'none';
+  const all = Object.entries(pages).map(([key, page]) => `===== ${key.toUpperCase()} =====\n${Object.entries(page.captures || {}).map(([name, lines]) => `-- ${name} --\n${lines.join('\n')}`).join('\n')}`).join('\n\n');
+  byId('detail-title').textContent = 'Dados completos da coleta';
+  byId('detail-content').textContent = `${all}\n\n===== STATUS TÉCNICO =====\n${JSON.stringify(data.connections || {}, null, 2)}`;
 }
 async function load() { byId('refresh').classList.add('loading'); try { const response = await fetch('/api/dados'); if (!response.ok) throw new Error('Sem dados'); render(await response.json()); } catch { byId('updated').textContent = 'Nenhuma coleta encontrada'; } finally { byId('refresh').classList.remove('loading'); } }
 byId('refresh').addEventListener('click', load); load();
