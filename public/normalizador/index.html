@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Registros — normalizador</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="pagina">
+    <header class="topo">
+      <h1>Registros coletados</h1>
+      <p class="subtitulo">Arquivos brutos em <code>saida/</code>, prontos pra virar JSON estruturado.</p>
+    </header>
+
+    <div class="barra">
+      <span id="contagem" class="contagem"></span>
+      <button id="atualizar" class="botao-secundario">Atualizar lista</button>
+    </div>
+
+    <ul id="lista" class="lista"></ul>
+
+    <p id="vazio" class="vazio" hidden>Nenhum arquivo encontrado em <code>saida/</code>.</p>
+  </div>
+
+  <div id="modal" class="modal" hidden>
+    <div class="modal-caixa">
+      <div class="modal-topo">
+        <span id="modal-titulo"></span>
+        <button id="modal-fechar" class="botao-fechar" aria-label="Fechar">×</button>
+      </div>
+      <pre id="modal-conteudo" class="modal-conteudo"></pre>
+    </div>
+  </div>
+
+  <script src="/script.js"></script>
+</body>
+</html>

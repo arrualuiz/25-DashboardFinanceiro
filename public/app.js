@@ -31,6 +31,7 @@ function render(data) {
   byId('updated').textContent = `Atualizado ${new Date(data.collectedAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}`;
   byId('source').textContent = `Fonte: ${data.source || data.url || 'Pluggy'}`;
   const pages = data.pages || {};
+  renderFluxoBonito(pages.fluxo?.captures?.base || []);
   let tabs = document.querySelector('.data-tabs');
   if (!tabs) {
     tabs = document.createElement('div'); tabs.className = 'data-tabs';
@@ -58,6 +59,17 @@ function render(data) {
     content.append(section);
   }
   const status = document.createElement('div'); status.className = 'data-page'; status.innerHTML = `<h3>Status técnico</h3><div class="data-card">${data.connections?.activeCount || '?'} conexões ativas</div>`; content.append(status);
+}
+function renderFluxoBonito(lines) {
+  let panel = document.querySelector('.fluxo-bonito');
+  if (!panel) { panel = document.createElement('section'); panel.className = 'panel fluxo-bonito'; const detail = document.querySelector('.data-detail'); (detail || document.querySelector('footer')).before(panel); }
+  const expense = lines.indexOf('DESPESAS'), future = lines.indexOf('DESPESAS FUTURAS'), month = lines.findIndex(x => /De \d{4}/i.test(x));
+  const categories = (start, end) => { const out=[]; for(let i=start+3;i<Math.min(end, start+20);i+=2) if(lines[i] && /^R\$/.test(lines[i+1]||'')) out.push([lines[i],lines[i+1]]); return out; };
+  panel.innerHTML = '<div class="flow-title"><h2>Fluxo de Caixa</h2><p>Despesas, receitas e movimentações das suas contas.</p></div><div class="flow-summary"></div><div class="flow-transactions"><h3>Transações coletadas</h3><div class="transaction-list"></div></div>';
+  const summary = panel.querySelector('.flow-summary');
+  for (const [title, index, end, tone] of [['Despesas',expense,future,'red'],['Despesas futuras',future,month,'yellow']]) { if(index<0) continue; const card=document.createElement('article'); card.className=`flow-card ${tone}`; card.innerHTML=`<h3>${title}</h3><strong>${lines[index+1]||'R$ 0'}</strong><small>${lines[index+2]||''}</small><div class="category-list"></div>`; for(const [name,value] of categories(index,end>0?end:lines.length)){const row=document.createElement('div');row.innerHTML=`<span>${name}</span><b>${value}</b>`;card.querySelector('.category-list').append(row);} summary.append(card); }
+  const start = lines.indexOf('Saídas') + 1, list = panel.querySelector('.transaction-list');
+  for(let i=Math.max(start,0); i<lines.length; i++){ if(/^\d+$/.test(lines[i]) && lines[i+1]){ const day=lines[i], weekday=lines[i+1], desc=lines[i+2], account=lines[i+3], category=lines[i+5], amount=lines[i+6]; if(desc && amount){const row=document.createElement('div');row.className='transaction-row';row.innerHTML=`<span class="day"><b>${day}</b>${weekday}</span><div><strong>${desc}</strong><small>${account} · ${category||''}</small></div><b class="amount">${amount}</b>`;list.append(row);}} }
 }
 async function load() { byId('refresh').classList.add('loading'); try { const response = await fetch('/api/dados'); if (!response.ok) throw new Error('Sem dados'); render(await response.json()); } catch { byId('updated').textContent = 'Nenhuma coleta encontrada'; } finally { byId('refresh').classList.remove('loading'); } }
 byId('refresh').addEventListener('click', load); load();
