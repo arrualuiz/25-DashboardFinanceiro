@@ -275,6 +275,13 @@ function normalizarRegistro(raw) {
   const fluxoCap = raw.pages?.fluxo?.captures?.base || raw.pages?.fluxo?.captures?.Todos;
   if (fluxoCap) {
     out.fluxo = parseFluxo(fluxoCap);
+    const historico = raw.pages?.fluxo?.historico || {};
+    out.fluxo.historico = Object.fromEntries(Object.entries(historico).map(([periodo, registro]) => {
+      const captures = registro.captures || {};
+      const normalizado = parseFluxo(captures.base || []);
+      normalizado.filtros = Object.fromEntries(['Todos', 'Entradas', 'Saídas'].filter(nome => captures[nome]).map(nome => [nome, parseFluxo(captures[nome])]));
+      return [periodo, normalizado];
+    }));
   }
 
   const ativosCap = raw.pages?.ativos?.captures?.base || raw.pages?.ativos?.captures?.Classes;
@@ -283,6 +290,9 @@ function normalizarRegistro(raw) {
   }
 
   out.connections = raw.connections;
+  // A normalização agrega os dados para consumo do dashboard, mas nunca
+  // descarta a coleta original nem as capturas alternativas dos filtros.
+  out.raw = raw;
   return out;
 }
 

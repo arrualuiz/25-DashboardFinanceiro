@@ -41,8 +41,30 @@ async function capture(name, url, actions = []) {
   }
   pages[name] = { url: page.url(), captures };
 }
+function monthFrom(lines) { return lines.find(line => /De\s+\d{4}$/i.test(line)) || `período-${Date.now()}`; }
+async function previousMonth() {
+  const month = page.locator('main').getByText(/De\s+\d{4}$/i).first();
+  const monthBox = await month.boundingBox();
+  if (!monthBox) throw new Error('Não encontrei o mês atual no fluxo de caixa.');
+  const buttons = page.locator('button'); const candidates = [];
+  for (let i = 0; i < await buttons.count(); i++) { const button = buttons.nth(i); if (!await button.isVisible()) continue; const box = await button.boundingBox(); if (box && box.y < monthBox.y + 45 && box.y + box.height > monthBox.y - 20 && box.x < monthBox.x) candidates.push({ button, distance: monthBox.x - box.x }); }
+  const candidate = candidates.sort((a, b) => a.distance - b.distance)[0];
+  if (!candidate) throw new Error('Não encontrei o botão para voltar um mês.');
+  await candidate.button.click(); await page.waitForTimeout(900);
+}
+async function captureFluxoHistorico(totalMeses = Number(process.env.PLUGGY_MESES || 12)) {
+  await page.goto(`${BASE}/cash`, { waitUntil: 'domcontentloaded', timeout: 60000 }); await page.waitForTimeout(1800);
+  const historico = {};
+  for (let index = 0; index < totalMeses; index++) {
+    const captures = {}; captures.base = (await page.locator('main').innerText()).split('\n').map(v => v.trim()).filter(Boolean);
+    const month = monthFrom(captures.base);
+    for (const action of ['Todos', 'Entradas', 'Saídas']) { const control = page.getByRole('button', { name: new RegExp(`^${action}$`, 'i') }).first(); if (await control.count() && await control.isVisible()) { await control.click(); await page.waitForTimeout(700); } captures[action] = (await page.locator('main').innerText()).split('\n').map(v => v.trim()).filter(Boolean); }
+    historico[month] = { captures }; if (index < totalMeses - 1) await previousMonth();
+  }
+  const first = Object.values(historico)[0]; pages.fluxo = { url: page.url(), captures: first?.captures || {}, historico };
+}
 await capture('overview', '/overview');
-await capture('fluxo', '/cash', ['Todos', 'Entradas', 'Saídas']);
+await captureFluxoHistorico();
 await capture('ativos', '/assets', ['Classes', 'Instituições']);
 await page.goto(`${BASE}/connections`, { waitUntil: 'domcontentloaded', timeout: 60000 });
 await page.waitForTimeout(1500);

@@ -35,11 +35,20 @@ async function listFiles() {
   })).then(items => items.sort((a, b) => new Date(b.modificadoEm) - new Date(a.modificadoEm)));
 }
 
+async function listCleanRecords() {
+  const files = (await fs.readdir(dataDir)).filter(name => /^registro-completo-\d+-limpo\.json$/.test(name));
+  const records = await Promise.all(files.map(async name => JSON.parse(await fs.readFile(path.join(dataDir, name), 'utf8'))));
+  return records.sort((a, b) => new Date(b.collectedAt) - new Date(a.collectedAt));
+}
+
 const server = http.createServer(async (request, response) => {
   try {
     const url = new URL(request.url, `http://${request.headers.host}`);
     if (url.pathname === '/api/arquivos' && request.method === 'GET') {
       return sendJson(response, 200, { arquivos: await listFiles() });
+    }
+    if (url.pathname === '/api/historico' && request.method === 'GET') {
+      return sendJson(response, 200, { registros: await listCleanRecords() });
     }
     if (url.pathname === '/api/ver' && request.method === 'GET') {
       const name = url.searchParams.get('nome');
@@ -60,8 +69,14 @@ const server = http.createServer(async (request, response) => {
     const publicPath = url.pathname === '/' ? '/index.html' : (url.pathname.endsWith('/') ? `${url.pathname}index.html` : url.pathname);
     let requested = path.join(publicDir, publicPath);
     if (isData) {
-      const files = (await fs.readdir(dataDir)).filter(name => /^registro(?:-completo)?-\d+\.json$/.test(name)).sort();
-      requested = path.join(dataDir, files.at(-1) || 'ultimo.json');
+      const files = (await fs.readdir(dataDir)).filter(name => /^registro-completo-\d+-limpo\.json$/.test(name));
+      const candidates = await Promise.all(files.map(async name => {
+        const filePath = path.join(dataDir, name);
+        const raw = JSON.parse(await fs.readFile(filePath, 'utf8'));
+        return { name, collectedAt: Date.parse(raw.collectedAt) || 0, modifiedAt: (await fs.stat(filePath)).mtimeMs };
+      }));
+      candidates.sort((a, b) => (b.collectedAt - a.collectedAt) || (b.modifiedAt - a.modifiedAt));
+      requested = path.join(dataDir, candidates[0]?.name || 'ultimo.json');
     }
     const file = await fs.readFile(path.normalize(requested));
     response.writeHead(200, { 'Content-Type': isData ? mime['.json'] : (mime[path.extname(requested)] || 'application/octet-stream'), 'Cache-Control': 'no-store' });

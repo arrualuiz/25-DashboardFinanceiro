@@ -2,6 +2,7 @@ const money = (value) => new Intl.NumberFormat('pt-BR', { style: 'currency', cur
 const valueOf = (lines, index) => lines[index] || 'R$ 0';
 const numberOf = (value) => Number(String(value).replace(/[^\d,.-]/g, '').replace(/\.(?=\d{3})/g, '').replace(',', '.')) || 0;
 const byId = (id) => document.getElementById(id);
+let historyRecords = [];
 function sectionsFromPages(data) {
   if (data.sections) return data.sections;
   const lines = data.pages?.overview?.captures?.base || [];
@@ -15,7 +16,68 @@ function sectionsFromPages(data) {
   });
   return sections;
 }
+function renderNormalized(data) {
+  const overview = data.overview || {};
+  const cards = overview.cartoes_credito || {};
+  const investments = overview.investimentos || {};
+  const accounts = overview.contas_bancarias || [];
+  const flow = data.fluxo || {};
+  const assets = data.ativos || {};
+  const fmt = (value) => money(value);
+  byId('total-balance').textContent = fmt(accounts.reduce((sum, account) => sum + (account.saldo || 0), 0));
+  byId('total-credit').textContent = fmt(cards.total_fatura);
+  byId('total-investments').textContent = fmt(investments.total);
+  byId('net-worth').textContent = fmt(accounts.reduce((sum, account) => sum + (account.saldo || 0), 0) + (investments.total || 0));
+  byId('evolution-value').textContent = fmt(data.overview.evolucao_saldo || 0);
+  byId('account-count').textContent = `${accounts.length} contas`;
+  byId('credit-limit').textContent = `Limite ${fmt(cards.limite)}`;
+  byId('credit-note').textContent = `${cards.percentual_uso || 0}% utilizado`;
+  byId('usage').textContent = `${cards.percentual_uso || 0}%`;
+  byId('usage-bar').style.width = `${Math.min(100, cards.percentual_uso || 0)}%`;
+  byId('investment-value').textContent = fmt(investments.total);
+  byId('investment-count').textContent = investments.resumo || `${assets.ativos?.length || 0} ativos`;
+  const firstClass = investments.por_classe?.[0];
+  byId('allocation-value').textContent = fmt(firstClass?.valor || investments.total);
+  byId('accounts-list').innerHTML = accounts.map(account => `<div class="row"><div><b>${account.banco}</b><small>${account.quantidade_contas || 0} conta(s) · ${account.percentual_do_total || 0}%</small></div><strong>${fmt(account.saldo)}</strong></div>`).join('');
+  byId('cards-list').innerHTML = (cards.cartoes || []).map(card => `<div class="row"><div><b>${card.nome}</b><small>xxxx ${card.final_cartao || '----'}</small></div><strong>${fmt(card.saldo)}</strong></div>`).join('');
+  byId('updated').textContent = `Atualizado ${new Date(data.collectedAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}`;
+  byId('source').textContent = `Fonte: ${data.source || 'Pluggy'} · JSON normalizado`;
+  const panel = document.querySelector('.fluxo-bonito') || document.createElement('section');
+  panel.className = 'panel fluxo-bonito';
+  panel.innerHTML = '<div class="flow-title"><h2>Fluxo de Caixa</h2><p>Despesas, receitas e movimentações das suas contas.</p></div><div class="flow-summary"></div><div class="flow-transactions"><h3>Transações coletadas</h3><div class="transaction-list"></div></div>';
+  if (!panel.parentElement) document.querySelector('footer').before(panel);
+  const summary = panel.querySelector('.flow-summary');
+  for (const [title, item, tone] of [['Despesas', flow.despesas, 'red'], ['Despesas futuras', flow.despesas_futuras, 'yellow']]) {
+    const card = document.createElement('article'); card.className = `flow-card ${tone}`;
+    card.innerHTML = `<h3>${title}</h3><strong>${fmt(item?.total)}</strong><small>${title === 'Despesas' ? 'Transações categorizadas' : 'Transações pendentes'}</small><div class="category-list"></div>`;
+    (item?.categorias || []).forEach(category => { const row = document.createElement('div'); row.innerHTML = `<span>${category.categoria}</span><b>${fmt(category.valor)}</b>`; card.querySelector('.category-list').append(row); });
+    summary.append(card);
+  }
+  const list = panel.querySelector('.transaction-list');
+  const accountFilter = byId('account-filter')?.value || '';
+  const directionFilter = byId('direction-filter')?.value || '';
+  const searchFilter = (byId('search-filter')?.value || '').toLowerCase().trim();
+  const sourceFlow = directionFilter === 'entrada' ? (flow.filtros?.Entradas || flow) : directionFilter === 'saida' ? (flow.filtros?.Saídas || flow) : (flow.filtros?.Todos || flow);
+  const visibleTransactions = (sourceFlow.transacoes || []).filter(transaction => { const text = `${transaction.descricao} ${transaction.conta} ${transaction.categoria || ''}`.toLowerCase(); return (!accountFilter || transaction.conta === accountFilter) && (!searchFilter || text.includes(searchFilter)); });
+  visibleTransactions.forEach(transaction => { const row = document.createElement('div'); row.className = 'transaction-row'; row.innerHTML = `<span class="day"><b>${transaction.dia}</b>${transaction.dia_semana}</span><div><strong>${transaction.descricao}</strong><small>${transaction.conta} · ${transaction.categoria || ''}</small></div><b class="amount">${fmt(transaction.valor)}</b>`; list.append(row); });
+  panel.querySelector('.flow-transactions h3').textContent = `Transações coletadas (${visibleTransactions.length} de ${(flow.transacoes || []).length})`;
+  document.querySelector('#ativos-detalhados, #dados-completos')?.remove();
+  const assetsPanel = document.createElement('section'); assetsPanel.id = 'ativos-detalhados'; assetsPanel.className = 'panel data-detail';
+  assetsPanel.innerHTML = `<div class="panel-head"><div><span class="panel-icon lime">↗</span><h2>Carteira completa</h2></div><span class="panel-kicker">${assets.ativos?.length || 0} ativos · ${fmt(assets.total)}</span></div><div class="table-wrap"><table><thead><tr><th>Ativo</th><th>Instituição</th><th>Tipo</th><th>Valor</th><th>%</th></tr></thead><tbody></tbody></table></div>`;
+  const assetBody = assetsPanel.querySelector('tbody');
+  (assets.ativos || []).forEach(asset => { const row = document.createElement('tr'); [asset.nome, asset.instituicao, asset.tipo, fmt(asset.valor), `${asset.percentual || 0}%`].forEach(value => { const cell = document.createElement('td'); cell.textContent = value; row.append(cell); }); assetBody.append(row); });
+  panel.after(assetsPanel);
+  const detailPanel = document.createElement('section'); detailPanel.id = 'dados-completos'; detailPanel.className = 'panel data-detail';
+  detailPanel.innerHTML = '<div class="panel-head"><div><span class="panel-icon coral">≡</span><h2>Dados completos da coleta</h2></div><span class="panel-kicker">Original preservado</span></div><div class="data-tabs"></div><div class="data-capture"></div>';
+  assetsPanel.after(detailPanel);
+  const captureArea = detailPanel.querySelector('.data-capture'); const rawPages = data.raw?.pages || {};
+  const showCapture = (pageName) => { captureArea.innerHTML = ''; const page = rawPages[pageName]; for (const [captureName, values] of Object.entries(page?.captures || {})) { const group = document.createElement('details'); group.className = 'data-group'; group.open = captureName === 'base'; const title = document.createElement('summary'); title.textContent = `${captureName} (${values.length} itens)`; group.append(title); const pre = document.createElement('pre'); pre.textContent = values.join('\n'); group.append(pre); captureArea.append(group); } };
+  Object.keys(rawPages).forEach((pageName, index) => { const button = document.createElement('button'); button.className = 'tab-button'; button.textContent = pageName; button.onclick = () => showCapture(pageName); detailPanel.querySelector('.data-tabs').append(button); if (index === 0) showCapture(pageName); });
+  const status = document.createElement('div'); status.className = 'data-page'; status.innerHTML = `<h3>Status técnico</h3><div class="data-card">${data.connections?.activeCount || '?'} conexões ativas · período ${flow.mes_referencia || 'não informado'}</div>`; detailPanel.append(status);
+  document.querySelectorAll('nav [data-view]').forEach(button => button.onclick = () => document.getElementById(button.dataset.view === 'overview' ? 'visao' : button.dataset.view === 'fluxo' ? 'fluxo' : button.dataset.view === 'ativos' ? 'ativos-detalhados' : 'dados-completos')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+}
 function render(data) {
+  if (data.overview && !data.pages) return renderNormalized(data);
   const sections = sectionsFromPages(data);
   const accounts = sections['CONTAS BANCÁRIAS'] || [];
   const cards = sections['CARTÕES DE CRÉDITO'] || [];
@@ -71,5 +133,16 @@ function renderFluxoBonito(lines) {
   const start = lines.indexOf('Saídas') + 1, list = panel.querySelector('.transaction-list');
   for(let i=Math.max(start,0); i<lines.length; i++){ if(/^\d+$/.test(lines[i]) && lines[i+1]){ const day=lines[i], weekday=lines[i+1], desc=lines[i+2], account=lines[i+3], category=lines[i+5], amount=lines[i+6]; if(desc && amount){const row=document.createElement('div');row.className='transaction-row';row.innerHTML=`<span class="day"><b>${day}</b>${weekday}</span><div><strong>${desc}</strong><small>${account} · ${category||''}</small></div><b class="amount">${amount}</b>`;list.append(row);}} }
 }
-async function load() { byId('refresh').classList.add('loading'); try { const response = await fetch('/api/dados'); if (!response.ok) throw new Error('Sem dados'); render(await response.json()); } catch { byId('updated').textContent = 'Nenhuma coleta encontrada'; } finally { byId('refresh').classList.remove('loading'); } }
+function setupFilters(records) {
+  const periods = byId('period-filter'); const accounts = byId('account-filter');
+  const periodMap = new Map(); records.forEach((record, recordIndex) => Object.entries(record.fluxo?.historico || { [record.fluxo?.mes_referencia || `registro ${recordIndex + 1}`]: record.fluxo }).forEach(([period, fluxo]) => { if (!periodMap.has(period)) periodMap.set(period, { record, period, fluxo }); }));
+  const periodEntries = [...periodMap.values()];
+  periods.innerHTML = periodEntries.map((entry, index) => `<option value="${index}">${entry.period}</option>`).join('');
+  const uniqueAccounts = [...new Set(periodEntries.flatMap(entry => [...(entry.fluxo?.contas_disponiveis || []), ...(entry.fluxo?.transacoes || []).map(transaction => transaction.conta)]).filter(Boolean))].sort();
+  accounts.innerHTML = '<option value="">Todas as contas</option>' + uniqueAccounts.map(account => `<option value="${account}">${account}</option>`).join('');
+  const refreshView = () => { const entry = periodEntries[Number(periods.value)] || periodEntries[0]; renderNormalized({ ...entry.record, fluxo: entry.fluxo }); };
+  [periods, accounts, byId('direction-filter'), byId('search-filter')].forEach(control => control.addEventListener(control.tagName === 'INPUT' ? 'input' : 'change', refreshView));
+  refreshView();
+}
+async function load() { byId('refresh').classList.add('loading'); try { const response = await fetch('/api/historico'); if (!response.ok) throw new Error('Sem dados'); const payload = await response.json(); historyRecords = payload.registros || []; if (!historyRecords.length) throw new Error('Sem dados'); setupFilters(historyRecords); } catch { byId('updated').textContent = 'Nenhuma coleta encontrada'; } finally { byId('refresh').classList.remove('loading'); } }
 byId('refresh').addEventListener('click', load); load();
